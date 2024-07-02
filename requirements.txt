@@ -1,0 +1,6 @@
+Django==5.0.1
+django-ninja==1.0.1
+django-unfold==0.20.4
+channels==4.0.0
+daphne==4.0.0
+django-import-export==4.1.0

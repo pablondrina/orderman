@@ -1,0 +1,81 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block content %}
+<div>
+    {{ block.super }}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('DOM carregado, iniciando conexão WebSocket...');
+        
+        // WebSocket logic
+        let websocket = new WebSocket('ws://127.0.0.1:8000/ws/orders/');
+        
+        websocket.onopen = function(event) {
+            console.log('Conexão WebSocket estabelecida com sucesso');
+        };
+        
+        websocket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('Mensagem WebSocket recebida:', data);
+
+            const row = document.querySelector(`#order-row-${data.order_id}`);
+            if (row) {
+                row.querySelector('.field-status').textContent = data.status;
+            } else {
+                location.reload();
+            }
+
+            new Audio("{% static 'sound/notification.mp3' %}").play();
+        };
+
+        websocket.onerror = function(event) {
+            console.error('Erro na conexão WebSocket:', event);
+        };
+
+        websocket.onclose = function(event) {
+            console.log('Conexão WebSocket fechada:', event);
+        };
+
+        // Isolated cancellation logic
+        window.confirmCancellation = async function(event, orderId) {
+            event.preventDefault();
+            console.info(`Tentando cancelar o pedido #${orderId}`);
+            
+            if (confirm('Tem certeza que deseja cancelar este pedido?')) {
+                try {
+                    const response = await fetch(`/admin/orders/order/${orderId}/mark_cancelled/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        }
+                    });
+
+                    console.info('Resposta do servidor:', response);
+                
+                    // Verifique se a resposta não está em vazio
+                    if (response.headers.get('content-type').includes('application/json')) {
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            document.querySelector(`#order-row-${orderId} .field-status`).textContent = 'cancelled';
+                            alert(`Pedido #${orderId} foi cancelado com sucesso.`);
+                        } else {
+                            alert('Erro ao cancelar o pedido: ' + data.error);
+                        }
+                    } else {
+                        console.error('Erro HTTP não OK ao cancelar o pedido:', response.statusText);
+                        alert('Erro ao cancelar o pedido.');
+                    }
+                } catch (error) {
+                    console.error('Erro ao processar a requisição para cancelar o pedido:', error);
+                    alert('Erro ao cancelar o pedido.');
+                }
+            }
+        };
+    });
+</script>
+{% endblock %}
